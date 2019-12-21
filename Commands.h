@@ -32,7 +32,7 @@
                                    else {
                                        bx = StackPop(&bxStack);
                                        StackPush(&bxStack, bx);
-                                       StackPush(&stack, RAM[GetG(smth, VarList, ax, bx, cx, dx)]); //printf("%d", GetE(smth, VarList, ax, bx, cx, dx));
+                                       StackPush(&stack, VarList[GetG(smth, VarList, ax, bx, cx, dx)].value); //printf("%d", GetE(smth, VarList, ax, bx, cx, dx));
                                    }
                                }
                                else {
@@ -61,7 +61,7 @@
                                    else {
                                        bx = StackPop(&bxStack);
                                        StackPush(&bxStack, bx);
-                                       RAM[GetG(smth, VarList, ax, bx, cx, dx)] = StackPop(&stack);  //printf("%d", GetE(smth, VarList, ax, bx, cx, dx));
+                                       VarList[GetG(smth, VarList, ax, bx, cx, dx)].value = StackPop(&stack); // printf("'%d'", GetG(smth, VarList, ax, bx, cx, dx));
                                    }
                                }
                                else
@@ -149,22 +149,30 @@
                                StackPush(&stack, second_n);
                                StackPush(&stack, first_n);}) )
 
-    DEF_CMD(CALL     ,37,-1, ({StackPush(&ReturnStack, pc - 1);
-                               if (*(text + pc + 5) == '[' && *(text + pc + 6) == '@') {
+    DEF_CMD(CALL     ,37,-1, ({if (*(text + pc + 5) == '[' && *(text + pc + 6) == '@') {
 
-                                   printf("d");
                                    char smth[SMTHSIZE] = {};
-                                   sscanf(text + ++pc, " [@%[^]]]", smth);
-                                   pc = *(int*)(text + CallParam(smth, VarList, &bxStack, &cxStack, text, pc) + pc + 1) - 1;
+                                   int n_bytes = 0;
+                                   sscanf(text + ++pc + 4, " [@%[^]]]%n", smth, &n_bytes);
+                                   StackPush(&ReturnStack, pc + 4 + n_bytes - 1);
+                                   pc = *(int*)(text + pc) - 1 + CallParam(smth, VarList, &bxStack, &cxStack, text, pc, 1);
                                }
-                               else
-                                   pc = *(int*)(text + pc + 1) - 1;}) )
+                               else {
+                                   CallParam(nullptr, VarList, &bxStack, &cxStack, text, pc, 0);
+                                   StackPush(&ReturnStack, pc + 4);  //printf("%d", pc + 4);
+                                   pc = *(int*)(text + pc + 1) - 1;
+                               } }) )
 
     DEF_CMD(RET      ,38, 0, ({pc = StackPop(&ReturnStack);
-                               if (*(text + pc + 1) != CMD_CALL)
-                                   printf("f");/*CallRet(VarList, &bxStack, &cxStack);*/}) )
+                               if (*(text + pc - 4) != CMD_CALL)
+                                  CallRet(VarList, &bxStack, &cxStack);}) )
 
     //остальное
+
+    DEF_CMD(VARS     ,40, 0, ({printf("\n------------------------");
+                               for(int n = 0; n < VarId; n++)
+                                   printf("\n%d, \"%s\"[%d] = %d", VarList[n].global, VarList[n].name, n, VarList[n].value);
+                               printf("\nglobal = %d\nVarId = %d\n------------------------\n", global, VarId); }))
 
     DEF_CMD(REGDUMP ,100, 0, ({printf("\nREGISTER DUMP:\n"
                                          "ax = %d\n"
